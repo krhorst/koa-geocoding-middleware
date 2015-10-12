@@ -128,8 +128,14 @@ describe("middleware", function(){
 			});
 			request(server.callback()).get('/').set('X-Forwarded-For', 'b').expect('false',done);
 		});	
-		
-		
+				
+		it("should set has_go flag to false if api has no geolocation information about ip", function(done){
+			server.use(function * (next){
+				this.body = this.has_geo;
+		  		yield * next;
+			});
+			request(server.callback()).get('/').set('X-Forwarded-For', no_geo_response.ip).expect('false',done);
+		})
 		
 	});
 	
