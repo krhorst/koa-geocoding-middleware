@@ -50,6 +50,15 @@ describe("middleware", function(){
 		})
 	})
 	
+	it("should have the location available in the request object", function(done){
+		var server = server_with_middleware(geo_middleware());
+		server.use(function * (next){
+			this.body = this.geo.loc;
+	  		yield * next;
+		});
+		request(server.callback()).get('/').set('X-Forwarded-For', geocode_api_response.ip).expect(geocode_api_response.loc,done)
+	});
+	
 	
 
 		
