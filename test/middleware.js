@@ -69,10 +69,16 @@ describe("middleware", function(){
 		
 		it("should have the location available in the request object", function(done){
 			server.use(function * (next){
-				this.body = this.geo.lat + "," + this.geo.long;
+				this.body = this.geo;
 		  		yield * next;
 			});
-			request(server.callback()).get('/').set('X-Forwarded-For', geocode_api_response.ip).expect(geocode_api_response.loc,done);
+			request(server.callback()).get('/').set('X-Forwarded-For', geocode_api_response.ip).expect({
+							"lat": geocode_api_response.loc.split(",")[0],
+							"long": geocode_api_response.loc.split(",")[1],								 
+							"city": "Mountain View",
+							"region": "California",
+							"country": "US",								 
+						},done);
 		});
 		
 		it("should set the has_geo flag to false if geolocation fails", function(done){
@@ -115,10 +121,16 @@ describe("middleware", function(){
 		
 		it("should have the location available in the request object", function(done){
 			server.use(function * (next){
-				this.body = this.geo.lat + "," + this.geo.long;
+				this.body = this.geo;
 		  		yield * next;
 			});
-			request(server.callback()).get('/').set('X-Forwarded-For', geocode_api_response.ip).expect(geocode_api_response.loc,done);
+			request(server.callback()).get('/').set('X-Forwarded-For', geocode_api_response.ip).expect({
+							"lat": geocode_api_response.loc.split(",")[0],
+							"long": geocode_api_response.loc.split(",")[1],								 
+							"city": "Mountain View",
+							"region": "California",
+							"country": "US",								 
+						},done);
 		});
 		
 		it("should set the has_geo flag to false if geolocation fails", function(done){

@@ -4,41 +4,42 @@ var request = require('co-request');
 
 var geo = {	
 	
-	setDefaultGeo: function(req){
-		req.geo = {};
-		req.has_geo = false;		
+	initialize: function(req, blacklist){
+		this.req = req;
+		this.blacklist = this.getBlacklistOrDefault(blacklist);
+	},
+	
+	setDefaultGeo: function(){
+		this.req.geo = {};
+		this.req.has_geo = false;		
 	},
 
-	pathInBlacklist: function(path, blacklist){
-		return blacklist.indexOf(path) === -1;
+	pathIsInBlacklist: function(){
+		return this.blacklist.indexOf(this.req.path) === -1;
 	},
 	
 	getBlacklistOrDefault: function(blacklist){		 
 		return Array.isArray(blacklist) ? blacklist : []; 
 	},		
 	
-	getAPIUrlForIp: function(ip){
-		return "http://ipinfo.io/" + ip + "/json";		
+	getAPIUrl: function(){
+		return "http://ipinfo.io/" + this.req.ip + "/json";		
 	},
 	
-	setRequestDataIfGeocodeSuccessful: function(req, geo_request){
-		var geoData = this.request_successful(geo_request) ? JSON.parse(geo_request.body) : false;					
+	setGeoDataIfGeoRequestSuccessful: function(geo_request){
+		var geoData = this.requestSuccessful(geo_request) ? JSON.parse(geo_request.body) : false;					
 		if (geoData && geoData.loc) {
-			this.setGeoData(req, geoData);
+			this.setGeoData(geoData);
 		}
 	},
 
-	request_successful: function(response){
+	requestSuccessful: function(response){
 		return response.statusCode === 200;
 	},
 	
-	makeGeoRequest: function(geo_request){		
-		return this.request_successful(geo_request) ? JSON.parse(geo_request.body) : false;
-	},	
-	
-	setGeoData: function(req, data){
-		req.geo = this.transformParsedData(data);
-		req.has_geo = true;
+	setGeoData: function(data){
+		this.req.geo = this.transformParsedData(data);
+		this.req.has_geo = true;
 	},
 	
 	transformParsedData: function(data){
@@ -56,13 +57,13 @@ var geo = {
 
 
 module.exports = function koaGeocodeMiddleware (blacklist) {	
-	return function * (next) {		
-		geo.setDefaultGeo(this);
-		if (geo.pathInBlacklist(this.path, geo.getBlacklistOrDefault(blacklist))){					
+	return function * (next) {
+		geo.initialize(this, blacklist);		
+		geo.setDefaultGeo();
+		if (geo.pathIsInBlacklist()){					
 			try {
-				var url = geo.getAPIUrlForIp(this.ip);
-				var geo_request = yield request(url);
-				geo.setRequestDataIfGeocodeSuccessful(this, geo_request);
+				var geo_request = yield request(geo.getAPIUrl());
+				geo.setGeoDataIfGeoRequestSuccessful(geo_request);
 			} catch(e){
 				console.log(e);
 			}			
