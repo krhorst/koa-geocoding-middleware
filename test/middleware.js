@@ -47,58 +47,128 @@ describe("middleware", function(){
     afterEach(function(){
 		nock.cleanAll();
 	})
-			
-	it("should allow a request to go through if no blacklist", function(done){	    
-		var server = server_with_middleware(geo_middleware());
-		request(server.callback()).get('/').set('X-Forwarded-For', geocode_api_response.ip).expect(200, 'Request Received').end(done);
-	});
-			
-	it("should allow a request to go through if not on blacklist", function(done){	    
-		var server = server_with_middleware(geo_middleware(['/differentroute']));
-		request(server.callback()).get('/').set('X-Forwarded-For', geocode_api_response.ip).expect(200, 'Request Received').end(done);
-	});
 	
-	it("should allow a request to go through if on blacklist", function(done){
-		var server = server_with_middleware(geo_middleware(['/']));
-		request(server.callback()).get('/').set('X-Forwarded-For', geocode_api_response.ip).expect(200, 'Request Received').end(done);
-	});
-	
-	it("should have called api if no blacklist", function(done){
-		var server = server_with_middleware(geo_middleware());		
-		request(server.callback()).get('/').set('X-Forwarded-For', geocode_api_response.ip).end(function(){
-			expect(api.isDone()).to.equal(true);		
-			done();
+	describe("without blacklist", function(){
+		
+		var server;
+		
+		beforeEach(function(){
+			server = server_with_middleware(geo_middleware());			
+		})
+		
+		it("should allow a request to go through", function(done){	    
+			request(server.callback()).get('/').set('X-Forwarded-For', geocode_api_response.ip).expect(200, 'Request Received').end(done);
 		});
-	});
-	
-	it("should not have geocoded if on blacklist", function(done){
-			var server = server_with_middleware(geo_middleware(['/']));
+		
+		it("should have called api", function(done){
+			request(server.callback()).get('/').set('X-Forwarded-For', geocode_api_response.ip).end(function(){
+				expect(api.isDone()).to.equal(true);		
+				done();
+			});
+		});
+		
+		it("should have the location available in the request object", function(done){
+			server.use(function * (next){
+				this.body = this.geo.lat + "," + this.geo.long;
+		  		yield * next;
+			});
+			request(server.callback()).get('/').set('X-Forwarded-For', geocode_api_response.ip).expect(geocode_api_response.loc,done);
+		});
+		
+		it("should set the has_geo flag to false if geolocation fails", function(done){
 			server.use(function * (next){
 				this.body = this.has_geo;
-			})
-			request(server.callback()).get('/').set('X-Forwarded-For', geocode_api_response.ip).expect('false').end(function(){
+		  		yield * next;
+			});
+			request(server.callback()).get('/').set('X-Forwarded-For', 'b').expect('false',done);
+		});		
+		
+		it("should set has_go flag to false if api has no geolocation information about ip", function(done){
+			server.use(function * (next){
+				this.body = this.has_geo;
+		  		yield * next;
+			});
+			request(server.callback()).get('/').set('X-Forwarded-For', no_geo_response.ip).expect('false',done);
+		})		
+		
+	})
+			
+	
+	describe("with irrelevant blacklist", function(){
+		
+		var server;
+		
+		beforeEach(function(){
+			server = server_with_middleware(geo_middleware(['/differentroute']));
+		})
+		
+		it("should allow a request to go through", function(done){	    			
+			request(server.callback()).get('/').set('X-Forwarded-For', geocode_api_response.ip).expect(200, 'Request Received').end(done);
+		});	
+		
+		it("should have called api", function(done){
+			request(server.callback()).get('/').set('X-Forwarded-For', geocode_api_response.ip).end(function(){
+				expect(api.isDone()).to.equal(true);		
+				done();
+			});
+		});
+		
+		it("should have the location available in the request object", function(done){
+			server.use(function * (next){
+				this.body = this.geo.lat + "," + this.geo.long;
+		  		yield * next;
+			});
+			request(server.callback()).get('/').set('X-Forwarded-For', geocode_api_response.ip).expect(geocode_api_response.loc,done);
+		});
+		
+		it("should set the has_geo flag to false if geolocation fails", function(done){
+			server.use(function * (next){
+				this.body = this.has_geo;
+		  		yield * next;
+			});
+			request(server.callback()).get('/').set('X-Forwarded-For', 'b').expect('false',done);
+		});	
+		
+		
+		
+	});
+	
+	describe("with blacklist matching request", function(){
+
+		var server;
+
+		beforeEach(function(){
+			server = server_with_middleware(geo_middleware(['/']));
+		});
+
+		it("should allow the request to go through", function(done){
+			request(server.callback()).get('/').set('X-Forwarded-For', geocode_api_response.ip).expect(200, 'Request Received').end(done);
+		});
+		
+		it("should not have made a request to geocode API", function(done){
+			request(server.callback()).get('/').set('X-Forwarded-For', geocode_api_response.ip).end(function(){
 				expect(api.isDone()).to.equal(false);		
 				done();
 			});
-	});
-	
-	it("should have the location available in the request object", function(done){
-		var server = server_with_middleware(geo_middleware());
-		server.use(function * (next){
-			this.body = this.geo.loc;
-	  		yield * next;
+		})
+		
+		it("should not have geocoded", function(done){		
+			server.use(function * (next){
+				this.body = this.has_geo;
+			})
+			request(server.callback()).get('/').set('X-Forwarded-For', geocode_api_response.ip).expect('false',done);
 		});
-		request(server.callback()).get('/').set('X-Forwarded-For', geocode_api_response.ip).expect(geocode_api_response.loc,done);
-	});
+		
+	})
 	
-	it("should set the has_geo flag to false if geolocation fails", function(done){
-		var server = server_with_middleware(geo_middleware());
-		server.use(function * (next){
-			this.body = this.has_geo;
-	  		yield * next;
-		});
-		request(server.callback()).get('/').set('X-Forwarded-For', 'b').expect('false',done);
-	});
+			
+	
+
+	
+	
+
+	
+	
 	
 	
 
